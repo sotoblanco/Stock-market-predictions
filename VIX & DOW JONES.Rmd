@@ -1,11 +1,11 @@
 ---
-title: "Untitled"
+title: "VIX & DOW JONES, are they moving together?"
 author: "Pastor Soto"
 date: "4/18/2021"
 output: html_document
 ---
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 library(lubridate)
 library(tidyverse)
 library(plyr)
