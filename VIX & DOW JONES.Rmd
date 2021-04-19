@@ -1,0 +1,210 @@
+---
+title: "Untitled"
+author: "Pastor Soto"
+date: "4/18/2021"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(lubridate)
+library(tidyverse)
+library(plyr)
+library(plotly)
+library(quantmod)
+library(tseries)
+library(timeSeries)
+library(forecast)
+library(xts)
+library(tibble)
+library(ggplot2)
+library(data.table)
+
+```
+
+
+The VIX is also call the fear index in which we expect that market goes down when the fear goes up. This is a common measure that will help us to analyze the trends on the market. Now we want to explore if in fact the VIX can be used to predict the Dow Jones movement. 
+
+```{r}
+setwd("C:/Users/Pastor/Documents/Courses/Upwork_Projects/forex/VX_fha87ep")
+vix <- read.table('VX_continuous_adjusted_1hour.txt', sep = ",")
+vix$V1 <- as.POSIXct(vix$V1, format = "%Y-%m-%d %H:%M:%S")
+vix$hour <- hour(vix$V1)
+vix$day <- day(vix$V1)
+vix$month <- month(vix$V1)
+vix$year <- year(vix$V1)
+vix <- plyr::rename(vix, c("V1"= "date","V2"= "open", "V3"="high", "V4" = "low", "V5" = "close", "V6" = "volume"))
+prices <- vix[, "close", drop = FALSE]
+n <- nrow(prices)
+ret <- ((prices[2:n, 1] - prices[1:(n-1), 1])/prices[1:(n-1), 1])
+vix_ret <- vix[-1,]
+vix_ret$ret <- ret
+ret_hour <- with(vix_ret, tapply(ret, factor(hour), mean))
+ret_hour_sd <- with(vix_ret, tapply(ret, factor(hour), sd))
+returns_hour_vix <- data.frame(ret_hour, ret_hour_sd)
+
+# get the dow jones data
+setwd("C:/Users/Pastor/Documents/Courses/Upwork_Projects/forex/YM_biqgzjm (1)")
+YM <- read.table('YM_continuous_adjusted_1hour.txt', sep = ",")
+YM$V1 <- as.POSIXct(YM$V1, format = "%Y-%m-%d %H:%M:%S")
+YM$hour <- hour(YM$V1)
+YM$day <- day(YM$V1)
+YM$month <- month(YM$V1)
+YM$year <- year(YM$V1)
+YM <- plyr::rename(YM, c("V1"= "date","V2"= "open", "V3"="high", "V4" = "low", "V5" = "close", "V6" = "volume"))
+prices <- YM[, "close", drop = FALSE]
+n <- nrow(prices)
+ret <- ((prices[2:n, 1] - prices[1:(n-1), 1])/prices[1:(n-1), 1])
+YM_ret <- YM[-1,]
+YM_ret$ret <- ret
+ret_hour <- with(YM_ret, tapply(ret, factor(hour), mean))
+ret_hour_sd <- with(YM_ret, tapply(ret, factor(hour), sd))
+returns_hour_YM <- data.frame(ret_hour, ret_hour_sd)
+
+```
+
+
+```{r}
+cor(returns_hour_YM$ret_hour, returns_hour_vix$ret_hour)
+mod <- lm(returns_hour_YM$ret_hour~returns_hour_vix$ret_hour)
+summary(mod)
+plot(returns_hour_vix$ret_hour*100, returns_hour_YM$ret_hour*100, xlab = "VIX Return by hour %", ylab= "YM return by hour %")
+abline(mod)
+predictions <- data.frame(predict(mod,returns_hour_vix),returns_hour_vix$ret_hour)
+predictions$return_per <- round(predictions$predict.mod..returns_hour_vix.*100,4)
+predictions$return_hour <- round(predictions$returns_hour_vix.ret_hour*100,6)
+```
+
+
+The results of the correlation analysis shows the association between the return of the vix index and teh return of the dow jones has a correlation of -0.66 this means that negative returns of the vix are associated with negative returns of the dow jones stock. The association is moderate and significant. We run a linear regression model to evaluate the prediction power of the VIX movements over the DOW JONES. The results suggest that it is a useful prediction and allow to explain 37% of the variability on the DOW JONES. We should be aware that is not a perfect indicator but using the indicator might improves our knowledge in the movements of the market. 
+Overall, the regression model shows that the movements of DOW JONES follows the opposite direction of the VIX and the size of this movements is 20% of the VIX. For example if the return from one hour to the other on the VIX is a profit of 20% (this is just an illustration there are no real movements of this size from one hour to the other) we expect a decrease down movement of the DOW JONES of about 4%.
+
+```{r}
+cor(returns_hour_YM$ret_hour_sd, returns_hour_vix$ret_hour_sd)
+plot(returns_hour_YM$ret_hour_sd*100, returns_hour_vix$ret_hour_sd*100, xlab = "YM Return by hour %", ylab= "VIX return by hour %")
+```
+
+The standard deviation which is a measure of variability from one hour to the other indicates positive association between VIX and YM indicating that when there is a lot of variation in VIX there is also high variations in price in YM. 
+
+Now we know how this stocks moves together we now wants to find out the movements inside the market for each stock to incorporate into our trading system.
+
+```{r}
+par(mfrow=c(1,2))
+ggplot(returns_hour_vix, aes(ret_hour_sd, ret_hour, label = rownames(returns_hour_vix)))+
+  geom_text()+
+  ggtitle("Hourly return of the VIX")
+ggplot(returns_hour_YM, aes(ret_hour_sd, ret_hour, label = rownames(returns_hour_YM)))+
+  geom_text()+
+  ggtitle("Hourly return of the YM")
+
+```
+
+Using this graph we can evaluate both stocks to answer which is the best hour to buy or sell the DOW JONES. 
+The results of the VIX shows that the highest return it is expected to be at 18:59, while the lowest it is expected to be at 2:59, 3:59, 8:59, 14:59 and 15:59. 
+
+On the other hand, the DOW shows that the highest return hours are 2:59, 14:59, and 6:59. While the lowest return hours are at 18:59, 7:59, 13:59, and 9:59.
+
+Using both measures we can identify common indicators. For example We should expect to buy in the hours with lowest price for DOW which are the price with the biggest "fear" this hour is 18:59. Ideally we place our positions at 17:59 and expect to be filled out by 18:59. The time to sell we should expect to be at the lowest "fear" hour in which the market shows highest prices. This hours are 2:59 and 14:59. 
+
+```{r}
+volume_hour <- with(YM_ret, tapply(volume, factor(hour), mean))
+volume_hour_sd <- with(YM_ret, tapply(volume, factor(hour), sd))
+returns_hour_YM_vol <- data.frame(volume_hour, volume_hour_sd)
+
+volume_hour <- with(vix_ret, tapply(volume, factor(hour), mean))
+volume_hour_sd <- with(vix_ret, tapply(volume, factor(hour), sd))
+returns_hour_vix_vol <- data.frame(volume_hour, volume_hour_sd)
+
+ggplot(returns_hour_YM_vol, aes(volume_hour_sd, volume_hour, label = rownames(returns_hour_YM_vol)))+
+  geom_text()
+ggplot(returns_hour_vix_vol, aes(volume_hour_sd, volume_hour, label = rownames(returns_hour_vix_vol)))+
+  geom_text()
+```
+
+Volume do not change between the vix and the DOW JONES shows similar behavior, in this situation we should expect to use the trend to evaluate what hours enter and what hour we should be our of the market.
+In a uptrend market for the dow we expect to enter in low volume hours, we should place our position at 16:59 and expect to be filled out at 17:59, the sell target should be at 10:59 or 15:59. 
+
+Now we know what to expect about the VIX and DOW we analyze what to expect after the market is close. We use the close market at 15:59. 
+
+```{r}
+df<- YM
+
+average.by.hour.by.reference <- function( df, hrs=16 ) {
+  
+  df <- as.data.table(df)
+  df[, date_number := as.numeric(as.Date(ymd_h( sprintf("%d-%d-%dT%d",year,month,day,hour) ) - hours(hrs))) ]
+  df[, delta := close - close[ hour == hrs ], .(date_number) ]
+  
+  return( df[, .(meanPerHour = mean(delta,na.rm=TRUE)), .(hour) ] )
+  
+}
+hour_16 <- average.by.hour.by.reference( df, 16 ) # produces the above results
+ggplot(hour_16, aes(x=hour, y = meanPerHour, label = hour_16$hour))+
+  geom_text()
+
+
+```
+
+The graph shows the expected change on the market after the closing price. We expect a negative change from 16:59 to 23:59. The highest price on the market after the closing price is at 14:59. Which shows consistency with the market analysis we did at the beginning. 
+
+
+```{r}
+hour_10 <- average.by.hour.by.reference( df, 10 ) # produces the above results
+ggplot(hour_10, aes(x=hour, y = meanPerHour, label = hour_10$hour))+
+  geom_text()
+```
+
+With the above graph we analyze what we could expect if we buy at 10:59. The expected return is always higher, reaching his peak at 6:59 on the next day. 
+
+```{r}
+hour_18 <- average.by.hour.by.reference( df, 18 ) # produces the above results
+ggplot(hour_18, aes(x=hour, y = meanPerHour, label = hour_18$hour))+
+  geom_text()
+
+```
+
+Now, using our analysis we expect that our positions get filled our at 18:59 and sell at 10:59 and 14:59, the graphs shows better candidates to sell if our positions get filled out at 18:59, the best time to sell is 16:59, follow by 12:59, 14:59 and 15:59. Surprisingly using 10:59 although we expect profit is not the best target for our purpose. A better target is at 12:59. This would be depending on when out target gets filled out since the expected profit is different in every situation. The below example shows that it our targets gets filled out at 1:59 the best time to sell is at 0:59 of the next day, while our second target should be at 16:59.
+
+```{r}
+hour_1 <- average.by.hour.by.reference( df, 1 ) # produces the above results
+ggplot(hour_1, aes(x=hour, y = meanPerHour, label = hour_1$hour))+
+  geom_text()
+
+```
+
+That been said we want to explore the size of the position that we should take. We should analyze the data in terms on return to see how much we should substract to calculate the pip. 
+
+```{r}
+YM_ret$ret <- YM_ret$ret *100
+df<- YM_ret
+
+average.by.hour.by.reference <- function( df, hrs=15 ) {
+  
+  df <- as.data.table(df)
+  df[, date_number := as.numeric(as.Date(ymd_h( sprintf("%d-%d-%dT%d",year,month,day,hour) ) - hours(hrs))) ]
+  df[, delta := ret - ret[ hour == hrs ], .(date_number) ]
+  
+  return( df[, .(meanPerHour = mean(delta,na.rm=TRUE)), .(hour) ] )
+  
+}
+hour_15 <- average.by.hour.by.reference( df, 15 ) # produces the above results
+ggplot(hour_15, aes(x=hour, y = meanPerHour, label = hour_15$hour))+
+  geom_text()
+
+```
+
+Surprisingly the mean return shows a different story. In which after closing price the lowest expected return is at 9:59 in which we expect a drop of 0.16%. To illustrate this example imagine that we buy at 34,000 at 15:59. The lowest target it is expected to be between 0 and 54.4 pip, and the highest expected increase is at 14:59
+
+We set our target hour for buying at 18:59
+
+```{r}
+hour_18 <- average.by.hour.by.reference( df, 18 ) # produces the above results
+ggplot(hour_18, aes(x=hour, y = meanPerHour, label = hour_18$hour))+
+  geom_text()
+
+hour_17 <- average.by.hour.by.reference( df, 17 ) # produces the above results
+ggplot(hour_17, aes(x=hour, y = meanPerHour, label = hour_17$hour))+
+  geom_text()
+
+```
+
+Using 18:59 as hour target we expect to sell at 14:59 for 2.5% more than the buying price. While using the 17:59 as our hour to place our position we expect to have a drop up to 1.5% and a target selling at 2.5%. 

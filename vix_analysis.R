@@ -27,9 +27,8 @@ ret_hour <- with(vix_ret, tapply(ret, factor(hour), mean))
 ret_hour_sd <- with(vix_ret, tapply(ret, factor(hour), sd))
 returns_hour <- data.frame(ret_hour, ret_hour_sd)
 
-g <- ggplot(returns_hour, aes(ret_hour_sd, ret_hour, label = rownames(returns_hour)))+
-  geom_point()
-ggplotly(g)
+ggplot(returns_hour, aes(ret_hour_sd, ret_hour, label = rownames(returns_hour)))+
+  geom_text()
 
 ## Volume
 
@@ -37,9 +36,8 @@ volume_hour <- with(vix_ret, tapply(volume, factor(hour), mean))
 volume_hour_sd <- with(vix_ret, tapply(volume, factor(hour), sd))
 returns_hour_v <- data.frame(volume_hour, volume_hour_sd)
 
-g <- ggplot(returns_hour_v, aes(volume_hour_sd, volume_hour, label = rownames(returns_hour_v)))+
-  geom_point()
-ggplotly(g)
+ggplot(returns_hour_v, aes(volume_hour_sd, volume_hour, label = rownames(returns_hour_v)))+
+  geom_text()
 
 
 vix_ret_3 <- vix_ret
